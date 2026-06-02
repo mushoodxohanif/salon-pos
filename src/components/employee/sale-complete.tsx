@@ -10,6 +10,7 @@ import { formatOMR } from "@/lib/currency";
 export type SaleReceiptData = {
   id: string;
   customerName: string | null;
+  customerPhone: string | null;
   discountAmount: number;
   total: number;
   createdAt: Date;
@@ -29,7 +30,8 @@ export function SaleComplete({ receipt }: SaleCompleteProps) {
   const t = useTranslations("employee.saleComplete");
   const locale = useLocale() as Locale;
 
-  const customerLabel = receipt.customerName?.trim() ? receipt.customerName : t("walkIn");
+  const customerLabel = receipt.customerName?.trim() ?? "";
+  const phoneLabel = receipt.customerPhone?.trim() ?? "";
 
   const dateLabel = new Intl.DateTimeFormat(locale === "ar" ? "ar-OM" : "en-OM", {
     dateStyle: "medium",
@@ -51,7 +53,10 @@ export function SaleComplete({ receipt }: SaleCompleteProps) {
       <div className="px-6">
         <div className="rounded-2xl border border-salon-border bg-white p-5">
           <div className="flex justify-between border-b border-salon-border pb-3 text-xs font-medium text-salon-muted">
-            <span>{customerLabel}</span>
+            <div className="flex flex-col gap-0.5">
+              <span>{customerLabel}</span>
+              {phoneLabel ? <span dir="ltr">{phoneLabel}</span> : null}
+            </div>
             <span>{dateLabel}</span>
           </div>
 

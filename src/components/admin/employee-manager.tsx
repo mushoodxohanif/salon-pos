@@ -4,6 +4,13 @@ import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRouter } from "@/intl/navigation";
 import { createEmployee, translateAdminError, updateEmployee } from "@/lib/admin/actions";
 import type { AdminBranch, AdminEmployee } from "@/lib/admin/queries";
@@ -184,31 +191,38 @@ function EmployeeFormDrawer({
             </Field>
 
             <Field label={t("branch")}>
-              <select
-                className={inputClass}
+              <Select
                 value={values.branchId}
-                onChange={(e) => setValues((v) => ({ ...v, branchId: e.target.value }))}
-                required
+                onValueChange={(branchId) => setValues((v) => ({ ...v, branchId }))}
               >
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.nameEn}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={selectTriggerClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.nameEn}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
 
             <Field label={t("role")}>
-              <select
-                className={inputClass}
+              <Select
                 value={values.role}
-                onChange={(e) =>
-                  setValues((v) => ({ ...v, role: e.target.value as "employee" | "admin" }))
+                onValueChange={(role) =>
+                  setValues((v) => ({ ...v, role: role as "employee" | "admin" }))
                 }
               >
-                <option value="employee">{t("roleEmployee")}</option>
-                <option value="admin">{t("roleAdmin")}</option>
-              </select>
+                <SelectTrigger className={selectTriggerClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="employee">{t("roleEmployee")}</SelectItem>
+                  <SelectItem value="admin">{t("roleAdmin")}</SelectItem>
+                </SelectContent>
+              </Select>
             </Field>
 
             {!isEdit ? (
@@ -325,3 +339,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = cn(
   "min-h-12 w-full rounded-xl border border-salon-border bg-white px-4 text-base text-salon-black outline-none focus-visible:border-salon-gold focus-visible:ring-2 focus-visible:ring-salon-gold/30",
 );
+
+const selectTriggerClass = cn(inputClass, "justify-between [&_svg]:text-salon-muted");

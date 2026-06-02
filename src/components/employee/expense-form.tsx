@@ -1,13 +1,19 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { BottomAction } from "@/components/employee/bottom-action";
 import { PageHeader } from "@/components/employee/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRouter } from "@/intl/navigation";
 import { parseOMR } from "@/lib/currency";
 import { createExpense, translateActionError } from "@/lib/employee/actions";
-import { cn } from "@/lib/utils";
 
 const CATEGORIES = ["supplies", "transport", "other"] as const;
 
@@ -17,9 +23,8 @@ export function ExpenseForm() {
   const [amountInput, setAmountInput] = useState("25.000");
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("supplies");
   const [note, setNote] = useState("");
-  const [showCategories, setShowCategories] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const amount = parseOMR(amountInput);
 
@@ -30,7 +35,9 @@ export function ExpenseForm() {
 
   function handleSubmit() {
     setError(null);
-    startTransition(async () => {
+    setIsSubmitting(true);
+
+    void (async () => {
       const result = await createExpense({
         amount,
         category,
@@ -39,12 +46,12 @@ export function ExpenseForm() {
 
       if (!result.ok) {
         setError(await translateActionError(result.error));
+        setIsSubmitting(false);
         return;
       }
 
-      router.push("/home");
-      router.refresh();
-    });
+      router.replace("/home");
+    })();
   }
 
   return (
@@ -75,47 +82,31 @@ export function ExpenseForm() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <span className="text-[15px] font-semibold text-salon-black">{t("categoryLabel")}</span>
+          <label htmlFor="expense-category" className="text-[15px] font-semibold text-salon-black">
+            {t("categoryLabel")}
+          </label>
           <p className="text-xs text-salon-muted">{t("categoryHint")}</p>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowCategories((v) => !v)}
-              className="flex min-h-14 w-full items-center justify-between rounded-xl border border-salon-border bg-white px-4 py-3 text-start"
+          <Select
+            value={category}
+            onValueChange={(value) => setCategory(value as (typeof CATEGORIES)[number])}
+          >
+            <SelectTrigger
+              id="expense-category"
+              className="min-h-14 h-auto w-full rounded-xl border-salon-border bg-white px-4 py-3 text-base shadow-none focus-visible:border-salon-gold focus-visible:ring-salon-gold/30 [&_svg]:text-salon-muted"
             >
-              <div>
-                <p className="text-base font-medium text-salon-black">
-                  {t(`categories.${category}`)}
-                </p>
-                <p className="text-xs text-salon-muted">{t(`categories.${category}Ar`)}</p>
-              </div>
-              <span className="text-salon-muted" aria-hidden>
-                ▾
-              </span>
-            </button>
-            {showCategories ? (
-              <ul className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-salon-border bg-white shadow-md">
-                {CATEGORIES.map((cat) => (
-                  <li key={cat}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCategory(cat);
-                        setShowCategories(false);
-                      }}
-                      className={cn(
-                        "flex w-full flex-col px-4 py-3 text-start hover:bg-salon-cream",
-                        cat === category && "bg-salon-cream",
-                      )}
-                    >
-                      <span className="font-medium text-salon-black">{t(`categories.${cat}`)}</span>
-                      <span className="text-xs text-salon-muted">{t(`categories.${cat}Ar`)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
+              <SelectValue className="sr-only" />
+            </SelectTrigger>
+            <SelectContent position="popper" className="rounded-xl border-salon-border">
+              {CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat} className="min-h-12 py-3">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-salon-black">{t(`categories.${cat}`)}</span>
+                    <span className="text-xs text-salon-muted">{t(`categories.${cat}Ar`)}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -145,8 +136,8 @@ export function ExpenseForm() {
         label={t("save")}
         hint={t("saveHint")}
         onClick={handleSubmit}
-        disabled={amount <= 0 || pending}
-        loading={pending}
+        disabled={amount <= 0 || isSubmitting}
+        loading={isSubmitting}
       />
     </div>
   );

@@ -1,8 +1,7 @@
 "use client";
 
-import { User } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { BottomAction } from "@/components/employee/bottom-action";
 import { WizardHeader } from "@/components/employee/wizard-header";
 import { Button } from "@/components/ui/button";
@@ -34,13 +33,13 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [customerName, setCustomerName] = useState("");
-  const [isWalkIn, setIsWalkIn] = useState(false);
+  const [customerPhone, setCustomerPhone] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
   const [activeCategoryId, setActiveCategoryId] = useState(catalog.categories[0]?.id ?? "");
   const [discountPreset, setDiscountPreset] = useState<DiscountPreset>("none");
   const [customDiscountInput, setCustomDiscountInput] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categoriesWithServices = useMemo(
     () => catalog.categories.filter((cat) => (catalog.servicesByCategory[cat.id]?.length ?? 0) > 0),
@@ -59,7 +58,7 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
   const discountAmount = discountAmountFromPreset(subtotal, discountPreset, customDiscountAmount);
   const total = saleTotal(subtotal, discountAmount);
 
-  const customerLabel = isWalkIn ? t("walkIn") : customerName.trim() || t("walkIn");
+  const customerLabel = customerName.trim() || t("customerName");
 
   function goBack() {
     if (step === 1) {
@@ -73,6 +72,20 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
     service: (typeof categoryServices)[0],
     tier: { label: string; amount: number },
   ) {
+    if (isTierSelected(service.id, tier.amount, tier.label)) {
+      setCart((prev) =>
+        prev.filter(
+          (item) =>
+            !(
+              item.serviceId === service.id &&
+              Math.abs(item.unitPrice - tier.amount) < 0.0005 &&
+              item.priceLabel === tier.label
+            ),
+        ),
+      );
+      return;
+    }
+
     const line: CartLine = {
       serviceId: service.id,
       unitPrice: tier.amount,
@@ -96,21 +109,17 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
   }
 
   function handleContinueStep1() {
-    setIsWalkIn(false);
-    setStep(2);
-  }
-
-  function handleWalkIn() {
-    setCustomerName("");
-    setIsWalkIn(true);
     setStep(2);
   }
 
   function handleComplete() {
     setError(null);
-    startTransition(async () => {
+    setIsSubmitting(true);
+
+    void (async () => {
       const result = await createSale({
-        customerName: isWalkIn ? null : customerName.trim() || null,
+        customerName: customerName.trim() || null,
+        customerPhone: customerPhone.trim() || null,
         items: cart.map(({ serviceId, unitPrice, priceLabel }) => ({
           serviceId,
           unitPrice,
@@ -122,12 +131,12 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
 
       if (!result.ok) {
         setError(await translateActionError(result.error));
+        setIsSubmitting(false);
         return;
       }
 
-      router.push(`/sale/complete/${result.saleId}`);
-      router.refresh();
-    });
+      router.replace(`/sale/complete/${result.saleId}`);
+    })();
   }
 
   if (categoriesWithServices.length === 0) {
@@ -142,7 +151,7 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex flex-col min-h-dvh">
       <WizardHeader
         title={step === 1 ? t("titleNew") : step === 2 ? t("titleServices") : t("titleConfirm")}
         subtitle={
@@ -158,7 +167,7 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
 
       {step === 1 ? (
         <>
-          <div className="flex flex-1 flex-col gap-6 px-6 py-2">
+          <div className="flex-1 flex flex-col gap-6 px-6 py-2">
             <div className="flex flex-col gap-2">
               <label htmlFor="customer-name" className="text-base font-semibold text-salon-black">
                 {t("customerName")}
@@ -168,34 +177,33 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
                 id="customer-name"
                 type="text"
                 value={customerName}
-                onChange={(e) => {
-                  setCustomerName(e.target.value);
-                  setIsWalkIn(false);
-                }}
+                onChange={(e) => setCustomerName(e.target.value)}
                 placeholder={t("customerPlaceholder")}
                 className="min-h-14 rounded-xl border border-salon-border bg-white px-4 text-base text-salon-black outline-none focus:border-salon-gold focus:ring-2 focus:ring-salon-gold/30"
               />
             </div>
-          </div>
-
-          <div className="px-6 pb-4">
-            <p className="text-center text-sm font-medium text-salon-muted">{t("orDivider")}</p>
-            <button
-              type="button"
-              onClick={handleWalkIn}
-              className="mt-3 flex w-full min-h-14 flex-col items-center justify-center gap-1 rounded-2xl bg-salon-black px-6 py-4"
-            >
-              <User className="size-6 text-salon-gold" aria-hidden />
-              <span className="text-[17px] font-semibold text-salon-cream">{t("walkIn")}</span>
-              <span className="text-xs text-salon-gold">{t("walkInAr")}</span>
-            </button>
+            <div className="flex flex-col gap-2">
+              <label htmlFor="customer-phone" className="text-base font-semibold text-salon-black">
+                {t("customerPhone")}
+              </label>
+              <p className="text-sm text-salon-muted">{t("customerPhoneHint")}</p>
+              <input
+                id="customer-phone"
+                type="tel"
+                inputMode="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder={t("customerPhonePlaceholder")}
+                className="min-h-14 rounded-xl border border-salon-border bg-white px-4 text-base text-salon-black outline-none focus:border-salon-gold focus:ring-2 focus:ring-salon-gold/30"
+              />
+            </div>
           </div>
 
           <BottomAction
             label={t("continue")}
             hint={t("continueHint")}
             onClick={handleContinueStep1}
-            disabled={!customerName.trim() && !isWalkIn}
+            disabled={!customerName.trim() || !customerPhone.trim()}
           />
         </>
       ) : null}
@@ -290,7 +298,7 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
 
       {step === 3 ? (
         <>
-          <div className="flex flex-col gap-3 overflow-y-auto px-5 py-2">
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-2">
             {cart.map((line) => {
               const name = locale === "ar" ? line.nameAr : line.nameEn;
               const nameAlt = locale === "ar" ? line.nameEn : line.nameAr;
@@ -397,8 +405,8 @@ export function SaleWizard({ catalog }: SaleWizardProps) {
             label={t("completeSale")}
             hint={t("completeSaleHint")}
             onClick={handleComplete}
-            disabled={cart.length === 0 || pending}
-            loading={pending}
+            disabled={cart.length === 0 || isSubmitting}
+            loading={isSubmitting}
           />
         </>
       ) : null}

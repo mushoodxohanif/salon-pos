@@ -21,6 +21,7 @@ export type SaleLineInput = {
 
 export type CreateSaleInput = {
   customerName: string | null;
+  customerPhone: string | null;
   items: SaleLineInput[];
   discountPreset: DiscountPreset;
   customDiscountAmount: number;
@@ -69,6 +70,7 @@ export async function createSale(input: CreateSaleInput): Promise<CreateSaleResu
   }
 
   const customerName = input.customerName?.trim() || null;
+  const customerPhone = input.customerPhone?.trim() || null;
 
   const [sale] = await db
     .insert(sales)
@@ -76,6 +78,7 @@ export async function createSale(input: CreateSaleInput): Promise<CreateSaleResu
       branchId: session.branchId,
       employeeId: session.employeeId,
       customerName,
+      customerPhone,
       discountAmount: discountAmount.toFixed(3),
       total: total.toFixed(3),
       currency: "OMR",
@@ -160,6 +163,7 @@ export async function getSaleReceipt(saleId: string) {
   return {
     id: sale.id,
     customerName: sale.customerName,
+    customerPhone: sale.customerPhone,
     discountAmount: Number.parseFloat(sale.discountAmount),
     total: Number.parseFloat(sale.total),
     createdAt: sale.createdAt,

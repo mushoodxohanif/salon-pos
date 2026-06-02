@@ -71,6 +71,7 @@ export const sales = pgTable("sales", {
     .notNull()
     .references(() => employees.id),
   customerName: text("customer_name"),
+  customerPhone: text("customer_phone"),
   discountAmount: numeric("discount_amount", { precision: 10, scale: 3 }).notNull().default("0"),
   total: numeric("total", { precision: 10, scale: 3 }).notNull(),
   currency: text("currency").notNull().default("OMR"),

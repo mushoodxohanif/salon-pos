@@ -11,6 +11,13 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRouter } from "@/intl/navigation";
 import type { Locale } from "@/intl/routing";
 import { createService, translateAdminError, updateService } from "@/lib/admin/actions";
@@ -234,17 +241,21 @@ function ServiceFormDrawer({
             }}
           >
             <Field label={t("category")}>
-              <select
-                className={inputClass}
+              <Select
                 value={values.categoryId}
-                onChange={(e) => setValues((v) => ({ ...v, categoryId: e.target.value }))}
+                onValueChange={(categoryId) => setValues((v) => ({ ...v, categoryId }))}
               >
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nameEn}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className={selectTriggerClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.nameEn}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label={t("nameEn")}>
               <input
@@ -361,3 +372,5 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass = cn(
   "min-h-12 w-full rounded-xl border border-salon-border bg-white px-4 text-base text-salon-black outline-none focus-visible:border-salon-gold focus-visible:ring-2 focus-visible:ring-salon-gold/30",
 );
+
+const selectTriggerClass = cn(inputClass, "justify-between [&_svg]:text-salon-muted");
