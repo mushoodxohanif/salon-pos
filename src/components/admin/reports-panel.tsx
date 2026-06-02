@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CalendarDays, ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { DateRange as DayPickerRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
@@ -98,7 +98,6 @@ export function ReportsPanel({
               variant="outline"
               className="min-h-10 gap-2 border-salon-border bg-white font-normal text-salon-black hover:bg-salon-cream/50"
             >
-              <Building2 className="size-4 text-salon-muted" />
               <span className="max-w-40 truncate">
                 {selectedBranch ? branchLabel(selectedBranch) : t("allBranches")}
               </span>
@@ -129,7 +128,6 @@ export function ReportsPanel({
               variant="outline"
               className="min-h-10 gap-2 border-salon-border bg-white font-normal text-salon-black hover:bg-salon-cream/50"
             >
-              <CalendarDays className="size-4 text-salon-muted" />
               <span className="max-w-48 truncate">{formatRangeLabel(resolvedRange, locale)}</span>
               <ChevronDownIcon className="size-4 text-salon-muted" />
             </Button>
