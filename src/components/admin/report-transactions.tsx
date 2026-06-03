@@ -92,9 +92,7 @@ export function ReportSalesList({
                     {formatReportDateTime(sale.createdAt, locale)}
                   </span>
                 </span>
-                <span className="text-xs text-salon-muted truncate w-full">
-                  {sale.customerName ?? t("walkIn")}
-                </span>
+                <span className="truncate w-full">{sale.employeeName}</span>
               </span>
               <span className="shrink-0 ps-3 font-semibold text-salon-gold">
                 {formatOMR(sale.total, locale)}
@@ -106,8 +104,10 @@ export function ReportSalesList({
               </div>
               <dl className="flex flex-col gap-1 text-sm">
                 <div className="flex justify-between gap-2">
-                  <dt className="text-salon-muted">{t("employee")}</dt>
-                  <dd className="font-medium text-salon-black">{sale.employeeName}</dd>
+                  <dt className="text-salon-muted">{t("customerName")}</dt>
+                  <dd className="font-medium text-salon-black">
+                    {sale.customerName ?? t("walkIn")}
+                  </dd>
                 </div>
                 {sale.customerPhone ? (
                   <div className="flex justify-between gap-2">
