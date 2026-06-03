@@ -6,7 +6,23 @@ import { requireAdmin } from "@/lib/admin/require-admin";
 import { normalizePriceTiers, validatePin, validatePriceTiers } from "@/lib/admin/validators";
 import { hashPassword, hashPin, verifyPin } from "@/lib/auth/password";
 import { getDb } from "@/lib/db";
-import { branches, employees, type PriceTier, serviceCategories, services } from "@/lib/db/schema";
+import {
+  branches,
+  employees,
+  expenses,
+  type PriceTier,
+  saleItems,
+  sales,
+  serviceCategories,
+  services,
+} from "@/lib/db/schema";
+import {
+  type DiscountPreset,
+  discountAmountFromPreset,
+  saleTotal,
+  subtotalFromItems,
+} from "@/lib/employee/sale-math";
+import { type SaleLineInput, validateSaleLines } from "@/lib/sales/validate-sale";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -23,8 +39,16 @@ const ADMIN_ERROR_KEYS = [
   "invalid_tiers",
   "invalid_category",
   "branch_has_history",
+  "no_items",
+  "invalid_service",
+  "invalid_price",
+  "invalid_sale",
+  "invalid_expense",
+  "invalid_amount",
   "save_failed",
 ] as const;
+
+const EXPENSE_CATEGORIES = new Set(["supplies", "transport", "other"]);
 
 export type AdminErrorKey = (typeof ADMIN_ERROR_KEYS)[number];
 
@@ -321,6 +345,172 @@ export async function updateService(serviceId: string, input: ServiceInput): Pro
       isActive: input.isActive,
     })
     .where(eq(services.id, serviceId));
+
+  return { ok: true };
+}
+
+// --- Branch / employee deactivate ---
+
+export async function deactivateBranch(branchId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db.select().from(branches).where(eq(branches.id, branchId)).limit(1);
+  if (!existing) return { ok: false, error: "invalid_branch" };
+
+  await db.update(branches).set({ isActive: false }).where(eq(branches.id, branchId));
+  return { ok: true };
+}
+
+export async function deactivateEmployee(employeeId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db.select().from(employees).where(eq(employees.id, employeeId)).limit(1);
+  if (!existing) return { ok: false, error: "invalid_branch" };
+
+  await db.update(employees).set({ isActive: false }).where(eq(employees.id, employeeId));
+  return { ok: true };
+}
+
+export async function deactivateService(serviceId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db.select().from(services).where(eq(services.id, serviceId)).limit(1);
+  if (!existing) return { ok: false, error: "invalid_service" };
+
+  await db.update(services).set({ isActive: false }).where(eq(services.id, serviceId));
+  return { ok: true };
+}
+
+// --- Sales & expenses ---
+
+export type AdminSaleUpdateInput = {
+  customerName: string | null;
+  customerPhone: string | null;
+  items: SaleLineInput[];
+  discountPreset: DiscountPreset;
+  customDiscountAmount: number;
+};
+
+export async function deleteSale(saleId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: sales.id })
+    .from(sales)
+    .where(eq(sales.id, saleId))
+    .limit(1);
+  if (!existing) return { ok: false, error: "invalid_sale" };
+
+  await db.transaction(async (tx) => {
+    await tx.delete(saleItems).where(eq(saleItems.saleId, saleId));
+    await tx.delete(sales).where(eq(sales.id, saleId));
+  });
+
+  return { ok: true };
+}
+
+export async function updateSale(
+  saleId: string,
+  input: AdminSaleUpdateInput,
+): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  if (!existing) return { ok: false, error: "invalid_sale" };
+
+  const validationError = await validateSaleLines(db, input.items);
+  if (validationError) return { ok: false, error: validationError };
+
+  const subtotal = subtotalFromItems(input.items);
+  const discountAmount = discountAmountFromPreset(
+    subtotal,
+    input.discountPreset,
+    input.customDiscountAmount,
+  );
+  const total = saleTotal(subtotal, discountAmount);
+  const customerName = input.customerName?.trim() || null;
+  const customerPhone = input.customerPhone?.trim() || null;
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sales)
+      .set({
+        customerName,
+        customerPhone,
+        discountAmount: discountAmount.toFixed(3),
+        total: total.toFixed(3),
+      })
+      .where(eq(sales.id, saleId));
+
+    await tx.delete(saleItems).where(eq(saleItems.saleId, saleId));
+    await tx.insert(saleItems).values(
+      input.items.map((line) => ({
+        saleId,
+        serviceId: line.serviceId,
+        unitPrice: line.unitPrice.toFixed(3),
+        priceLabel: line.priceLabel,
+      })),
+    );
+  });
+
+  return { ok: true };
+}
+
+export type AdminExpenseUpdateInput = {
+  amount: number;
+  category: string;
+  note: string | null;
+};
+
+export async function deleteExpense(expenseId: string): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: expenses.id })
+    .from(expenses)
+    .where(eq(expenses.id, expenseId))
+    .limit(1);
+  if (!existing) return { ok: false, error: "invalid_expense" };
+
+  await db.delete(expenses).where(eq(expenses.id, expenseId));
+  return { ok: true };
+}
+
+export async function updateExpense(
+  expenseId: string,
+  input: AdminExpenseUpdateInput,
+): Promise<ActionResult> {
+  if (!(await requireAdmin())) return { ok: false, error: "unauthorized" };
+
+  if (!EXPENSE_CATEGORIES.has(input.category)) {
+    return { ok: false, error: "invalid_category" };
+  }
+  if (input.amount <= 0) {
+    return { ok: false, error: "invalid_amount" };
+  }
+
+  const db = getDb();
+  const [existing] = await db
+    .select({ id: expenses.id })
+    .from(expenses)
+    .where(eq(expenses.id, expenseId))
+    .limit(1);
+  if (!existing) return { ok: false, error: "invalid_expense" };
+
+  await db
+    .update(expenses)
+    .set({
+      amount: input.amount.toFixed(3),
+      category: input.category,
+      note: input.note?.trim() || null,
+    })
+    .where(eq(expenses.id, expenseId));
 
   return { ok: true };
 }

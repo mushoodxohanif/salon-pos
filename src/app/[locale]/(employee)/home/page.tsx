@@ -1,13 +1,15 @@
 import { eq } from "drizzle-orm";
-import { ChevronRight, MapPin, Receipt, Wallet } from "lucide-react";
+import { ChevronRight, History, MapPin, Receipt, Wallet } from "lucide-react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
+import { AttendanceCard } from "@/components/employee/attendance-card";
 import { Link } from "@/intl/navigation";
 import type { Locale } from "@/intl/routing";
 import { getSession } from "@/lib/auth/session";
 import { formatOMR } from "@/lib/currency";
 import { getDb } from "@/lib/db";
 import { branches, employees } from "@/lib/db/schema";
+import { formatWorkedDuration, getAttendanceStatus } from "@/lib/employee/attendance";
 import { getTodaySummary } from "@/lib/employee/today-summary";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +29,9 @@ export default async function EmployeeHomePage({ params }: Props) {
   let employeeName: string | null = null;
   let todaySales = 0;
   let todayRevenue = 0;
+  let attendanceCheckedIn = false;
+  let attendanceCheckedInTime: string | null = null;
+  let attendanceHoursToday = "0m";
 
   if (session) {
     const db = getDb();
@@ -47,6 +52,18 @@ export default async function EmployeeHomePage({ params }: Props) {
     const summary = await getTodaySummary(session.branchId, session.employeeId);
     todaySales = summary.saleCount;
     todayRevenue = summary.revenueTotal;
+
+    const attendance = await getAttendanceStatus();
+    if (attendance) {
+      attendanceCheckedIn = attendance.isCheckedIn;
+      attendanceHoursToday = formatWorkedDuration(attendance.workedMsToday, typedLocale);
+      if (attendance.checkedInAt) {
+        attendanceCheckedInTime = new Intl.DateTimeFormat(
+          typedLocale === "ar" ? "ar-OM" : "en-OM",
+          { timeStyle: "short", timeZone: "Asia/Muscat" },
+        ).format(attendance.checkedInAt);
+      }
+    }
   }
 
   return (
@@ -82,6 +99,16 @@ export default async function EmployeeHomePage({ params }: Props) {
         </div>
       </div>
 
+      {session ? (
+        <div className="px-6 pb-5">
+          <AttendanceCard
+            isCheckedIn={attendanceCheckedIn}
+            checkedInTimeLabel={attendanceCheckedInTime}
+            hoursTodayLabel={attendanceHoursToday}
+          />
+        </div>
+      ) : null}
+
       <div className="flex flex-1 flex-col gap-4 px-6 pb-8">
         <HomeActionCard
           href="/sale"
@@ -96,6 +123,13 @@ export default async function EmployeeHomePage({ params }: Props) {
           title={t("addExpense")}
           subtitle={t("addExpenseAr")}
           icon={<Wallet className="size-10 text-salon-gold" aria-hidden />}
+        />
+        <HomeActionCard
+          href="/history"
+          variant="secondary"
+          title={t("salesHistory")}
+          subtitle={t("salesHistoryAr")}
+          icon={<History className="size-10 text-salon-gold" aria-hidden />}
         />
       </div>
     </main>

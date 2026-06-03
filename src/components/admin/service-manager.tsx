@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import {
   Accordion,
   AccordionContent,
@@ -20,7 +21,12 @@ import {
 } from "@/components/ui/select";
 import { useRouter } from "@/intl/navigation";
 import type { Locale } from "@/intl/routing";
-import { createService, translateAdminError, updateService } from "@/lib/admin/actions";
+import {
+  createService,
+  deactivateService,
+  translateAdminError,
+  updateService,
+} from "@/lib/admin/actions";
 import type { AdminService, AdminServiceCategory } from "@/lib/admin/queries";
 import { formatOMR, parseOMR } from "@/lib/currency";
 import type { PriceTier } from "@/lib/db/schema";
@@ -43,6 +49,7 @@ export function ServiceManager({ categories, servicesByCategory, locale }: Servi
   const t = useTranslations("admin.services");
   const router = useRouter();
   const [mode, setMode] = useState<FormMode>({ type: "closed" });
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminService | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -93,14 +100,26 @@ export function ServiceManager({ categories, servicesByCategory, locale }: Servi
                             .join(" · ")}
                         </p>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setMode({ type: "edit", service })}
-                      >
-                        {t("edit")}
-                      </Button>
+                      <div className="flex shrink-0 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMode({ type: "edit", service })}
+                        >
+                          {t("edit")}
+                        </Button>
+                        {service.isActive ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setDeactivateTarget(service)}
+                          >
+                            {t("delete")}
+                          </Button>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                   <li className="px-4 py-3">
@@ -121,6 +140,35 @@ export function ServiceManager({ categories, servicesByCategory, locale }: Servi
           );
         })}
       </Accordion>
+
+      <ConfirmDialog
+        open={deactivateTarget != null}
+        title={t("deleteTitle")}
+        description={t("deleteDescription", {
+          name: deactivateTarget ? serviceName(deactivateTarget) : "",
+        })}
+        confirmLabel={t("deleteConfirm")}
+        cancelLabel={t("cancel")}
+        pending={pending}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          setError(null);
+          startTransition(async () => {
+            const result = await deactivateService(deactivateTarget.id);
+            if (!result.ok) {
+              setError(await translateAdminError(result.error));
+              return;
+            }
+            setDeactivateTarget(null);
+            router.refresh();
+          });
+        }}
+      />
+
+      {error && deactivateTarget == null ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : null}
 
       {mode.type !== "closed" ? (
         <ServiceFormDrawer

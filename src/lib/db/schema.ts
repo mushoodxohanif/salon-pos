@@ -70,12 +70,25 @@ export const sales = pgTable("sales", {
   employeeId: uuid("employee_id")
     .notNull()
     .references(() => employees.id),
+  saleCode: text("sale_code").notNull().unique(),
   customerName: text("customer_name"),
   customerPhone: text("customer_phone"),
   discountAmount: numeric("discount_amount", { precision: 10, scale: 3 }).notNull().default("0"),
   total: numeric("total", { precision: 10, scale: 3 }).notNull(),
   currency: text("currency").notNull().default("OMR"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceSessions = pgTable("attendance_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeeId: uuid("employee_id")
+    .notNull()
+    .references(() => employees.id),
+  branchId: uuid("branch_id")
+    .notNull()
+    .references(() => branches.id),
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true }).notNull(),
+  checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
 });
 
 export const saleItems = pgTable("sale_items", {
@@ -108,6 +121,7 @@ export const branchesRelations = relations(branches, ({ many }) => ({
   employees: many(employees),
   sales: many(sales),
   expenses: many(expenses),
+  attendanceSessions: many(attendanceSessions),
 }));
 
 export const employeesRelations = relations(employees, ({ one, many }) => ({
@@ -117,6 +131,7 @@ export const employeesRelations = relations(employees, ({ one, many }) => ({
   }),
   sales: many(sales),
   expenses: many(expenses),
+  attendanceSessions: many(attendanceSessions),
 }));
 
 export const serviceCategoriesRelations = relations(serviceCategories, ({ many }) => ({
@@ -165,6 +180,17 @@ export const expensesRelations = relations(expenses, ({ one }) => ({
   }),
 }));
 
+export const attendanceSessionsRelations = relations(attendanceSessions, ({ one }) => ({
+  employee: one(employees, {
+    fields: [attendanceSessions.employeeId],
+    references: [employees.id],
+  }),
+  branch: one(branches, {
+    fields: [attendanceSessions.branchId],
+    references: [branches.id],
+  }),
+}));
+
 export type Branch = typeof branches.$inferSelect;
 export type NewBranch = typeof branches.$inferInsert;
 export type Employee = typeof employees.$inferSelect;
@@ -179,3 +205,5 @@ export type SaleItem = typeof saleItems.$inferSelect;
 export type NewSaleItem = typeof saleItems.$inferInsert;
 export type Expense = typeof expenses.$inferSelect;
 export type NewExpense = typeof expenses.$inferInsert;
+export type AttendanceSession = typeof attendanceSessions.$inferSelect;
+export type NewAttendanceSession = typeof attendanceSessions.$inferInsert;

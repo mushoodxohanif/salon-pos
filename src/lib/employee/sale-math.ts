@@ -30,6 +30,22 @@ function roundOmr(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
+export function inferDiscountPreset(
+  subtotal: number,
+  discountAmount: number,
+): { preset: DiscountPreset; customAmount: number } {
+  if (discountAmount <= 0) return { preset: "none", customAmount: 0 };
+  const pct5 = discountAmountFromPreset(subtotal, "percent5", 0);
+  const pct10 = discountAmountFromPreset(subtotal, "percent10", 0);
+  if (Math.abs(discountAmount - pct5) < 0.001) {
+    return { preset: "percent5", customAmount: 0 };
+  }
+  if (Math.abs(discountAmount - pct10) < 0.001) {
+    return { preset: "percent10", customAmount: 0 };
+  }
+  return { preset: "custom", customAmount: discountAmount };
+}
+
 export function priceTierMatches(
   tiers: { label: string; amount: number }[],
   unitPrice: number,

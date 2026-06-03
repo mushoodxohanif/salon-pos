@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { SaleCodeCopy } from "@/components/employee/sale-code-copy";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/intl/navigation";
 import type { Locale } from "@/intl/routing";
@@ -9,6 +10,7 @@ import { formatOMR } from "@/lib/currency";
 
 export type SaleReceiptData = {
   id: string;
+  saleCode: string;
   customerName: string | null;
   customerPhone: string | null;
   discountAmount: number;
@@ -51,6 +53,11 @@ export function SaleComplete({ receipt }: SaleCompleteProps) {
       </div>
 
       <div className="px-6">
+        <div className="mb-4 rounded-2xl border border-salon-border bg-white p-4">
+          <p className="text-xs font-medium text-salon-muted">{t("saleId")}</p>
+          <SaleCodeCopy saleCode={receipt.saleCode} className="mt-2" />
+        </div>
+
         <div className="rounded-2xl border border-salon-border bg-white p-5">
           <div className="flex justify-between border-b border-salon-border pb-3 text-xs font-medium text-salon-muted">
             <div className="flex flex-col gap-0.5">

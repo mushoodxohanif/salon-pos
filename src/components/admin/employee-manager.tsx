@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -12,7 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRouter } from "@/intl/navigation";
-import { createEmployee, translateAdminError, updateEmployee } from "@/lib/admin/actions";
+import {
+  createEmployee,
+  deactivateEmployee,
+  translateAdminError,
+  updateEmployee,
+} from "@/lib/admin/actions";
 import type { AdminBranch, AdminEmployee } from "@/lib/admin/queries";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +34,7 @@ export function EmployeeManager({ employees, branches, locale }: EmployeeManager
   const t = useTranslations("admin.employees");
   const router = useRouter();
   const [mode, setMode] = useState<FormMode>({ type: "closed" });
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminEmployee | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -59,17 +66,58 @@ export function EmployeeManager({ employees, branches, locale }: EmployeeManager
                 {!employee.isActive ? ` · ${t("inactive")}` : null}
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setMode({ type: "edit", employee })}
-            >
-              {t("edit")}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMode({ type: "edit", employee })}
+              >
+                {t("edit")}
+              </Button>
+              {employee.isActive ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeactivateTarget(employee)}
+                >
+                  {t("delete")}
+                </Button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
+
+      <ConfirmDialog
+        open={deactivateTarget != null}
+        title={t("deleteTitle")}
+        description={t("deleteDescription", {
+          name: deactivateTarget?.name ?? "",
+        })}
+        confirmLabel={t("deleteConfirm")}
+        cancelLabel={t("cancel")}
+        pending={pending}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          setError(null);
+          startTransition(async () => {
+            const result = await deactivateEmployee(deactivateTarget.id);
+            if (!result.ok) {
+              setError(await translateAdminError(result.error));
+              return;
+            }
+            setDeactivateTarget(null);
+            router.refresh();
+          });
+        }}
+      />
+
+      {error && deactivateTarget == null ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : null}
 
       {mode.type !== "closed" ? (
         <EmployeeFormDrawer

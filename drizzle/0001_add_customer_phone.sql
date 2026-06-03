@@ -1,1 +1,1 @@
-ALTER TABLE "sales" ADD COLUMN "customer_phone" text;
+ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "customer_phone" text;

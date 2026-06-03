@@ -8,7 +8,7 @@ export const PIN_MAX_LENGTH = 6;
 export const PUBLIC_PATHS = new Set(["/", "/login", "/admin/login"]);
 
 /** Employee routes requiring authentication (without locale prefix). */
-export const EMPLOYEE_PROTECTED_PREFIXES = ["/home", "/sale", "/expense"];
+export const EMPLOYEE_PROTECTED_PREFIXES = ["/home", "/history", "/sale", "/expense"];
 
 /** Admin routes requiring authentication (without locale prefix). */
 export const ADMIN_PROTECTED_PREFIX = "/admin";

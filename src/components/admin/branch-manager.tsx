@@ -2,10 +2,16 @@
 
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { useRouter } from "@/intl/navigation";
-import { createBranch, translateAdminError, updateBranch } from "@/lib/admin/actions";
+import {
+  createBranch,
+  deactivateBranch,
+  translateAdminError,
+  updateBranch,
+} from "@/lib/admin/actions";
 import type { AdminBranch } from "@/lib/admin/queries";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +26,7 @@ export function BranchManager({ branches, locale }: BranchManagerProps) {
   const t = useTranslations("admin.branches");
   const router = useRouter();
   const [mode, setMode] = useState<FormMode>({ type: "closed" });
+  const [deactivateTarget, setDeactivateTarget] = useState<AdminBranch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -52,17 +59,58 @@ export function BranchManager({ branches, locale }: BranchManagerProps) {
                 </span>
               ) : null}
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setMode({ type: "edit", branch })}
-            >
-              {t("edit")}
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setMode({ type: "edit", branch })}
+              >
+                {t("edit")}
+              </Button>
+              {branch.isActive ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setDeactivateTarget(branch)}
+                >
+                  {t("delete")}
+                </Button>
+              ) : null}
+            </div>
           </li>
         ))}
       </ul>
+
+      <ConfirmDialog
+        open={deactivateTarget != null}
+        title={t("deleteTitle")}
+        description={t("deleteDescription", {
+          name: deactivateTarget ? displayName(deactivateTarget) : "",
+        })}
+        confirmLabel={t("deleteConfirm")}
+        cancelLabel={t("cancel")}
+        pending={pending}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => {
+          if (!deactivateTarget) return;
+          setError(null);
+          startTransition(async () => {
+            const result = await deactivateBranch(deactivateTarget.id);
+            if (!result.ok) {
+              setError(await translateAdminError(result.error));
+              return;
+            }
+            setDeactivateTarget(null);
+            router.refresh();
+          });
+        }}
+      />
+
+      {error && deactivateTarget == null ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : null}
 
       {mode.type !== "closed" ? (
         <BranchFormDrawer

@@ -5,19 +5,14 @@ import { getTranslations } from "next-intl/server";
 import { getSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { expenses, saleItems, sales, services } from "@/lib/db/schema";
+import { type SaleLineInput, validateSaleLines } from "@/lib/sales/validate-sale";
+import { allocateSaleCode } from "./sale-code";
 import {
   type DiscountPreset,
   discountAmountFromPreset,
-  priceTierMatches,
   saleTotal,
   subtotalFromItems,
 } from "./sale-math";
-
-export type SaleLineInput = {
-  serviceId: string;
-  unitPrice: number;
-  priceLabel: string | null;
-};
 
 export type CreateSaleInput = {
   customerName: string | null;
@@ -35,11 +30,12 @@ export async function createSale(input: CreateSaleInput): Promise<CreateSaleResu
     return { ok: false, error: "unauthorized" };
   }
 
-  if (input.items.length === 0) {
-    return { ok: false, error: "no_items" };
+  const db = getDb();
+  const validationError = await validateSaleLines(db, input.items);
+  if (validationError) {
+    return { ok: false, error: validationError };
   }
 
-  const db = getDb();
   const subtotal = subtotalFromItems(input.items);
   const discountAmount = discountAmountFromPreset(
     subtotal,
@@ -48,35 +44,16 @@ export async function createSale(input: CreateSaleInput): Promise<CreateSaleResu
   );
   const total = saleTotal(subtotal, discountAmount);
 
-  for (const line of input.items) {
-    const [service] = await db
-      .select({
-        id: services.id,
-        priceTiers: services.priceTiers,
-        isActive: services.isActive,
-      })
-      .from(services)
-      .where(eq(services.id, line.serviceId))
-      .limit(1);
-
-    if (!service?.isActive) {
-      return { ok: false, error: "invalid_service" };
-    }
-
-    const tiers = service.priceTiers ?? [];
-    if (!priceTierMatches(tiers, line.unitPrice, line.priceLabel)) {
-      return { ok: false, error: "invalid_price" };
-    }
-  }
-
   const customerName = input.customerName?.trim() || null;
   const customerPhone = input.customerPhone?.trim() || null;
+  const saleCode = await allocateSaleCode(db, session.branchId);
 
   const [sale] = await db
     .insert(sales)
     .values({
       branchId: session.branchId,
       employeeId: session.employeeId,
+      saleCode,
       customerName,
       customerPhone,
       discountAmount: discountAmount.toFixed(3),
@@ -162,6 +139,7 @@ export async function getSaleReceipt(saleId: string) {
 
   return {
     id: sale.id,
+    saleCode: sale.saleCode,
     customerName: sale.customerName,
     customerPhone: sale.customerPhone,
     discountAmount: Number.parseFloat(sale.discountAmount),
@@ -183,6 +161,8 @@ const ACTION_ERROR_KEYS = [
   "invalid_price",
   "invalid_category",
   "invalid_amount",
+  "already_checked_in",
+  "not_checked_in",
   "save_failed",
 ] as const;
 

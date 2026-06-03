@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "@/intl/navigation";
 import type { Locale } from "@/intl/routing";
 import { formatOMR, parseOMR } from "@/lib/currency";
-import { createSale, type SaleLineInput, translateActionError } from "@/lib/employee/actions";
+import { createSale, translateActionError } from "@/lib/employee/actions";
 import type { ServiceCatalog } from "@/lib/employee/catalog";
 import {
   type DiscountPreset,
@@ -16,6 +16,7 @@ import {
   saleTotal,
   subtotalFromItems,
 } from "@/lib/employee/sale-math";
+import type { SaleLineInput } from "@/lib/sales/validate-sale";
 import { cn } from "@/lib/utils";
 
 type CartLine = SaleLineInput & {
